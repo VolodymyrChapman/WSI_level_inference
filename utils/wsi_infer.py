@@ -132,10 +132,88 @@ def predict_over_wsi(outdir:str,
             gc.collect()
 
 
-# # function for creating heatmaps of whole slide inferences 
-# def wsi_heatmap(wsi_dataloader,
-#                 scores_df,
-#                 outdir:str):
+# function for creating heatmaps of whole slide inferences 
+def wsi_heatmap(wsi_dataloader,
+                scores_df,
+                col_to_show:str,
+                file_col: str,
+                outdir:str, 
+                coord_col_1: str = 'start_coord_0',
+                coord_col_2: str = 'start_coord_1',
+                patch_size_col:str = 'patch_size',
+                display_mag:int = 2,
+                cmap:str = 'viridis'):
+
+    for batch in wsi_dataloader:
+        for filepath in batch:
+            wsi_id = os.path.split(filepath[0])[-1]
+            wsi_id = str(os.path.splitext(wsi_id)[0])
+
+            # gauge which classification group wsi falls into - TP, TN etc.
+            filt_data = scores_df[scores_df[file_col] == wsi_id]
+
+            if len(filt_data) > 0:
+
+                TF_class = (filt_data[gt_col] == filt_data[pred_col]).map({True:'T', False:'F'}).iloc[0]
+                PN_class = filt_data[pred_col].astype(int).map({0:'N', 1:'P'}).iloc[0]
+                pred_class = str(TF_class + PN_class)
+                # print(pred_class, filt_data[gt_col].values, filt_data[pred_col].values)
+
+                sld = OpenSlide(filepath)
+                # determine level of downsample needed for target magnificaiton
+                mag_diff = int(sld.properties['aperio.AppMag']) // display_mag
+                req_dims = [dim//mag_diff for dim in sld.dimensions]
+                req_mag_thumb = np.array(sld.get_thumbnail([dim//mag_diff for dim in sld.dimensions]))
+
+                # np dims reverse of PIL
+                heatmap = np.zeros(req_dims[::-1])
+                
+                filt_patch_df = patch_info_df[scores_df[file_col].astype(str) == wsi_id]
+                
+                # retrieve coordinates for patches to extract
+                coords = list(zip(filt_patch_df[coord_col_2], filt_patch_df[coord_col_1]))
+                # for each set of coordinates, add heatmap output
+                for patch in range(len(filt_patch_df)):
+                    coord = coords[patch]
+                    coords_down = [c//mag_diff for c in coord]
+                    patch_size_tuple = tuple(eval(filt_patch_df.iloc[patch][patch_size_col]))[::-1]
+                    patch_size_down = [s//mag_diff for s in patch_size_tuple]
+                    heatmap[coords_down[0]:coords_down[0] + patch_size_down[0], coords_down[1]: coords_down[1] + patch_size_down[1]] = filt_patch_df.iloc[patch][1]
+                    
+                # create heatmap figure
+                fig, ax = plt.subplots(1,1,figsize = (20,20))
+                ax.imshow(req_mag_thumb)
+                sns.heatmap(heatmap, cmap = cmap,vmin = -0.5, vmax = 0.5, mask = abs(heatmap) < 0.2, ax = ax, alpha = 0.3)
+                ax.axis('off')
+                
+                fig.tight_layout()
+
+                # save figure
+                outfile = os.path.join(outdir, f'{wsi_id}_{col_to_show}.tiff')
+                plt.savefig(outfile)
+
+                # clean up
+                plt.clf() 
+                plt.close()
+            
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## Function for whole slide inference from patch inferences 
 
