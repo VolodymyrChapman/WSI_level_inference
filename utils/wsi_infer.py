@@ -1,7 +1,7 @@
 from torch import nn, argmax, from_numpy
 import pandas as pd
 import numpy as np
-from preprocessing_wsi import retrieve_patches
+from utils.preprocessing_wsi import retrieve_patches
 import os
 
 # # check that sufficient numbers of patches exist
@@ -10,7 +10,6 @@ import os
 # positive_threshold = 1
 # num_patches = 'all'
 # min_patch_number = 100
-# outdir = 'data/DLBCL_COO_CV_test_regression' 
 # cache_dir = os.path.join(outdir, 'cache')
 # feature_batch_size = 100
 
@@ -153,12 +152,6 @@ def wsi_heatmap(wsi_dataloader,
             filt_data = scores_df[scores_df[file_col] == wsi_id]
 
             if len(filt_data) > 0:
-
-                TF_class = (filt_data[gt_col] == filt_data[pred_col]).map({True:'T', False:'F'}).iloc[0]
-                PN_class = filt_data[pred_col].astype(int).map({0:'N', 1:'P'}).iloc[0]
-                pred_class = str(TF_class + PN_class)
-                # print(pred_class, filt_data[gt_col].values, filt_data[pred_col].values)
-
                 sld = OpenSlide(filepath)
                 # determine level of downsample needed for target magnificaiton
                 mag_diff = int(sld.properties['aperio.AppMag']) // display_mag
